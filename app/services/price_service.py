@@ -6,9 +6,10 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.locks import release_advisory_lock, try_advisory_lock
 from app.db.models import PricePoint
 from app.db.repository import PricePointRepository
-from app.db.session import session_scope
+from app.db.session import create_engine, create_sessionmaker
 from app.deribit.client import DeribitClient
 
 SUPPORTED_TICKERS: tuple[str, ...] = ("btc_usd", "eth_usd")
@@ -26,20 +27,35 @@ class IngestResult:
 
 
 class PriceService:
-    async def poll_and_store_prices(self) -> IngestResult:
+    _ingest_lock_key: int = 640_001
+
+    async def poll_and_store_prices(self) -> IngestResult | None:
         ts_unix = compute_minute_bucket()
 
-        async with session_scope() as session:
-            repo = PricePointRepository(session)
+        engine = create_engine()
+        session_factory = create_sessionmaker(engine)
 
-            async with DeribitClient() as deribit:  # type: ignore[attr-defined]
-                for ticker in SUPPORTED_TICKERS:
-                    price = await deribit.get_index_price(ticker)
-                    await repo.upsert_price_point(
-                        ticker=ticker, ts_unix=ts_unix, price=price
-                    )
+        async with engine.connect() as connection:
+            locked = await try_advisory_lock(connection, key=self._ingest_lock_key)
+            if not locked:
+                await engine.dispose()
+                return None
 
-            await session.commit()
+            try:
+                async with session_factory(bind=connection) as session:
+                    repo = PricePointRepository(session)
+
+                    async with DeribitClient() as deribit:
+                        for ticker in SUPPORTED_TICKERS:
+                            price = await deribit.get_index_price(ticker)
+                            await repo.upsert_price_point(
+                                ticker=ticker, ts_unix=ts_unix, price=price
+                            )
+
+                    await session.commit()
+            finally:
+                await release_advisory_lock(connection, key=self._ingest_lock_key)
+                await engine.dispose()
 
         return IngestResult(ts_unix=ts_unix, tickers=SUPPORTED_TICKERS)
 
