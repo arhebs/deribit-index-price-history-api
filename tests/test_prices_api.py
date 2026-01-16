@@ -95,3 +95,80 @@ def test_prices_list_and_range_envelope_shape(monkeypatch, client: TestClient) -
     payload2 = resp2.json()
     assert payload2["count"] == 2
     assert payload2["results"][0]["ticker"] == "btc_usd"
+
+
+def test_prices_list_requires_ticker(client: TestClient) -> None:
+    resp = client.get("/prices")
+    assert resp.status_code == 422
+
+
+def test_prices_range_requires_ticker(client: TestClient) -> None:
+    resp = client.get("/prices/range")
+    assert resp.status_code == 422
+
+
+def test_prices_latest_requires_ticker(client: TestClient) -> None:
+    resp = client.get("/prices/latest")
+    assert resp.status_code == 422
+
+
+def test_prices_list_validates_limit_max(client: TestClient) -> None:
+    resp = client.get(
+        "/prices", params={"ticker": "btc_usd", "limit": 1001, "offset": 0}
+    )
+    assert resp.status_code == 422
+
+
+def test_prices_list_returns_empty_envelope(monkeypatch, client: TestClient) -> None:
+    class _FakeService:
+        async def count_prices(self, **_kwargs) -> int:
+            return 0
+
+        async def list_prices(self, **_kwargs) -> list[object]:
+            return []
+
+    monkeypatch.setattr("app.api.routes.prices.PriceService", _FakeService)
+
+    resp = client.get("/prices", params={"ticker": "btc_usd"})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload == {"count": 0, "next": None, "previous": None, "results": []}
+
+
+def test_prices_range_returns_empty_envelope(monkeypatch, client: TestClient) -> None:
+    class _FakeService:
+        async def count_prices(self, **_kwargs) -> int:
+            return 0
+
+        async def list_range(self, **_kwargs) -> list[object]:
+            return []
+
+    monkeypatch.setattr("app.api.routes.prices.PriceService", _FakeService)
+
+    resp = client.get(
+        "/prices/range",
+        params={"ticker": "btc_usd", "from_ts": 1, "to_ts": 2},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload == {"count": 0, "next": None, "previous": None, "results": []}
+
+
+def test_prices_latest_returns_price_point(monkeypatch, client: TestClient) -> None:
+    class _FakeService:
+        async def latest_price(self, **kwargs) -> object:
+            ticker = kwargs["ticker"]
+            return type(
+                "PP",
+                (),
+                {"ticker": ticker, "ts_unix": 2, "price": Decimal("2.2")},
+            )()
+
+    monkeypatch.setattr("app.api.routes.prices.PriceService", _FakeService)
+
+    resp = client.get("/prices/latest", params={"ticker": "btc_usd"})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["ticker"] == "btc_usd"
+    assert payload["ts_unix"] == 2
+    assert payload["price"] == "2.2"
