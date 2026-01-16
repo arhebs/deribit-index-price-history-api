@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.egg-info/
+.eggs/
+
+# Virtual envs
+.venv/
+venv/
+ENV/
+
+# Test/cache
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+
+# Local-only env
+.env
+
+# Git / IDE
+.git/
+.idea/
+
+# OS
+.DS_Store
+
+# Python packaging
+build/
+dist/
+
+# UV
+.uv/
+
+# Other
+*.log
