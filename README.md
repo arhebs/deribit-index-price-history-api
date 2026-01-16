@@ -155,7 +155,15 @@ container command (API vs worker vs beat vs migrations).
 
 ### Two-container option (app + Postgres)
 
-This is an optional setup that runs API + Celery worker + Celery beat + Redis (broker) inside a single container.
+This is an optional setup that runs **Postgres** as one container, and runs **Redis + API + Celery worker + Celery beat**
+inside a single `app` container.
+
+Notes:
+
+- The `app` container starts via `docker/start-allinone.sh`, which runs `alembic upgrade head` before launching
+  Supervisor.
+- Redis runs inside the same container, so `REDIS_URL` is set to `redis://localhost:6379/0` in
+  `docker-compose.two.yml`.
 
 ```bash
 docker compose -f docker-compose.two.yml up --build
