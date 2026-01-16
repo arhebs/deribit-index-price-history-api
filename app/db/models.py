@@ -34,5 +34,4 @@ class PricePoint(Base):
     )
 
 
-Index("ix_price_points_ticker_ts_unix", PricePoint.ticker, PricePoint.ts_unix)
 Index("ix_price_points_ts_unix", PricePoint.ts_unix)
