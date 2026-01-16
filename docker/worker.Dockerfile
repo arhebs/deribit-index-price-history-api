@@ -18,5 +18,6 @@ RUN uv sync --frozen --no-dev
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
+COPY docker/start-worker.sh ./docker/start-worker.sh
 
-CMD ["uv", "run", "celery", "-A", "app.workers.celery_app.celery_app", "worker", "-l", "info"]
+CMD ["./docker/start-worker.sh"]

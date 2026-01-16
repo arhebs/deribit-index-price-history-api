@@ -9,11 +9,26 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7
     ports:
       - "6379:6379"
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/migrate.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/deribit
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   api:
     build:
@@ -27,8 +42,12 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
 
   worker:
     build:
@@ -40,8 +59,12 @@ services:
       DERIBIT_BASE_URL: https://test.deribit.com/api/v2
       LOG_LEVEL: INFO
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
 
   beat:
     build:
@@ -53,9 +76,14 @@ services:
       DERIBIT_BASE_URL: https://test.deribit.com/api/v2
       LOG_LEVEL: INFO
     depends_on:
-      - postgres
-      - redis
-      - worker
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      worker:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

@@ -18,5 +18,6 @@ RUN uv sync --frozen --no-dev
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
+COPY docker/start-beat.sh ./docker/start-beat.sh
 
-CMD ["uv", "run", "celery", "-A", "app.workers.celery_app.celery_app", "beat", "-l", "info"]
+CMD ["./docker/start-beat.sh"]
