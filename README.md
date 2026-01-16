@@ -5,6 +5,12 @@ and exposes a FastAPI API for querying historical time-series.
 
 Stack: FastAPI + Celery (worker + beat) + PostgreSQL + Redis.
 
+## How to Run
+
+```bash
+docker compose up --build
+```
+
 ## Quick Start (Docker)
 
 Prereqs: Docker + Docker Compose.
