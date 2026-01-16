@@ -21,6 +21,9 @@ COPY alembic.ini ./alembic.ini
 
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/start-allinone.sh ./docker/start-allinone.sh
+COPY docker/start-api.sh ./docker/start-api.sh
+COPY docker/start-worker.sh ./docker/start-worker.sh
+COPY docker/start-beat.sh ./docker/start-beat.sh
 
 EXPOSE 8000
 
