@@ -91,6 +91,17 @@ uv run ruff format --check .
 
 Integration tests require Postgres and are skipped unless `TEST_DATABASE_URL` is set.
 
+Run them explicitly:
+
+```bash
+# Start stack (or bring your own Postgres)
+docker compose up -d postgres
+
+export TEST_DATABASE_URL="postgresql+asyncpg://postgres:postgres@127.0.0.1:15432/deribit"
+
+uv run pytest -m integration -q
+```
+
 ## Sanity Run Transcript (optional)
 
 ```bash
