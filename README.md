@@ -7,19 +7,20 @@ Stack: FastAPI + Celery (worker + beat) + PostgreSQL + Redis.
 
 ## How to Run
 
-```bash
-docker compose up --build
-```
-
-## Quick Start (Docker)
-
 Prereqs: Docker + Docker Compose.
 
 ```bash
-# Note: this compose file maps Postgres/Redis to non-default host ports
-# (15432 and 16379) to avoid conflicts with existing local services.
+# Fresh start (optional)
+docker compose down -v --remove-orphans
+
+# Start stack (Postgres + Redis + migrate + api + worker + beat)
 docker compose up --build
 ```
+
+Note: this compose file maps Postgres/Redis to non-default host ports
+(15432 and 16379) to avoid conflicts with existing local services.
+
+## Quick Start (Docker)
 
 API is exposed at `http://127.0.0.1:8000`.
 
@@ -125,17 +126,19 @@ $ curl -sS "http://127.0.0.1:8000/prices/latest?ticker=btc_usd"
 
 ## Design Decisions
 
-- **Minute bucket timestamps**: samples are stored at `ts_unix = floor(now / 60) * 60` to ensure exactly one sample per
-  ticker per minute and to make retries idempotent.
-- **Idempotent ingestion**: enforced by `UNIQUE (ticker, ts_unix)` + Postgres UPSERT (`ON CONFLICT DO UPDATE`).
-- **Overlap protection**: ingestion uses a Postgres advisory lock so the scheduled job can’t overlap across retries or
-  multiple workers.
-- **Price precision**: stored as `NUMERIC(20, 10)` and returned as a JSON string (Pydantic serializes `Decimal` as
-  string) to avoid float rounding.
-- **Pagination envelope**: list endpoints return `{count, next, previous, results}` and pagination uses `limit`/
-  `offset`.
-- **Rate limits**: Deribit public endpoints are rate-limited; this service polls only twice per minute, which is low
-  volume, but transient HTTP/RPC failures are surfaced as errors (auth/backoff could be added later).
+- **Minute bucket timestamps**: samples are stored at `ts_unix = floor(now / 60) * 60` to produce one stable bucket per
+  minute, making ingestion idempotent (retries land in the same bucket) and simplifying time-series queries.
+- **Why advisory locks (in addition to unique constraints)**: `UNIQUE (ticker, ts_unix)` + UPSERT guarantees data
+  integrity, but it doesn’t prevent wasted work if multiple workers overlap (duplicate Deribit calls + duplicate DB
+  writes). A Postgres advisory lock makes the ingest job single-flight across workers/retries.
+- **Price precision (Decimal → Numeric)**: Deribit JSON values are parsed into `Decimal` (via `Decimal(str(x))`), stored
+  in Postgres as `NUMERIC(20, 10)`, and returned as a JSON string to avoid IEEE-754 float rounding.
+- **Startup race handling**: `docker-compose.yml` uses a `pg_isready` healthcheck for Postgres plus a one-shot `migrate`
+  service. `api/worker/beat` depend on migrations completing successfully before starting.
+- **Pagination envelope**: list endpoints return `{count, next, previous, results}` with `limit`/`offset`. Pagination
+  links preserve original query params and only rewrite `limit`/`offset`.
+- **Deribit error semantics**: Deribit can return HTTP 200 with a JSON-RPC `error` payload; the client treats that as a
+  failure and raises typed exceptions (rate limit vs generic RPC error).
 
 ## Docker Notes
 
@@ -146,6 +149,9 @@ $ curl -sS "http://127.0.0.1:8000/prices/latest?ticker=btc_usd"
 - `postgres` with a `pg_isready` healthcheck
 - a one-shot `migrate` service (Alembic)
 - `depends_on` conditions so `api/worker/beat` wait for Postgres readiness and successful migrations
+
+All application services build from the same Dockerfile (`docker/allinone.Dockerfile`) and differ only by the
+container command (API vs worker vs beat vs migrations).
 
 ### Two-container option (app + Postgres)
 
