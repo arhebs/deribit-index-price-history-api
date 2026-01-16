@@ -8,6 +8,7 @@ from app.db.repository import PricePointRepository
 from app.db.session import session_scope
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_upsert_overwrites_price_for_same_ticker_ts(
     test_database_url: str,
