@@ -133,9 +133,19 @@ $ curl -sS "http://127.0.0.1:8000/prices/latest?ticker=btc_usd"
 
 ## Docker Notes
 
+### Default (5 services)
+
 `docker-compose.yml` includes:
 
 - `postgres` with a `pg_isready` healthcheck
 - a one-shot `migrate` service (Alembic)
 - `depends_on` conditions so `api/worker/beat` wait for Postgres readiness and successful migrations
+
+### Two-container option (app + Postgres)
+
+This is an optional setup that runs API + Celery worker + Celery beat + Redis (broker) inside a single container.
+
+```bash
+docker compose -f docker-compose.two.yml up --build
+```
 
