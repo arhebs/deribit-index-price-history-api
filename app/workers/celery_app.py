@@ -3,6 +3,7 @@ from __future__ import annotations
 from celery import Celery
 
 from app.core.config import get_settings
+from app.workers.schedule import beat_schedule
 
 
 def create_celery_app() -> Celery:
@@ -22,6 +23,7 @@ def create_celery_app() -> Celery:
         timezone="UTC",
         enable_utc=True,
         task_acks_late=True,
+        beat_schedule=beat_schedule,
     )
 
     return celery
