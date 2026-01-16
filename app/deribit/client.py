@@ -22,6 +22,17 @@ class DeribitClient:
         self._session = session
         self._owned_session: aiohttp.ClientSession | None = None
 
+    async def __aenter__(self) -> "DeribitClient":
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: object | None,
+    ) -> None:
+        await self.close()
+
     async def get_index_price(self, index_name: str) -> Decimal:
         url = f"{self._base_url}/public/get_index_price"
 
@@ -32,7 +43,7 @@ class DeribitClient:
                 if resp.status != 200:
                     raise DeribitHttpError(status=resp.status, body=body_text)
                 payload = await resp.json()
-        except aiohttp.ClientError as exc:
+        except (aiohttp.ClientError, TimeoutError) as exc:
             raise DeribitHttpError(status=0, body=str(exc)) from exc
 
         if isinstance(payload, dict) and payload.get("error"):
