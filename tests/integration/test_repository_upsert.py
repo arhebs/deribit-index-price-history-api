@@ -22,7 +22,13 @@ async def test_upsert_overwrites_price_for_same_ticker_ts(
         await repo.upsert_price_point(ticker="btc_usd", ts_unix=1, price=Decimal("2.2"))
         await session.commit()
 
-        latest = await repo.get_latest(ticker="btc_usd")
-        assert latest is not None
-        assert latest.price == Decimal("2.2")
-        assert latest.ts_unix == 1
+        rows = await repo.list_range(
+            ticker="btc_usd",
+            from_ts=1,
+            to_ts=1,
+            limit=10,
+            offset=0,
+        )
+        assert len(rows) == 1
+        assert rows[0].ts_unix == 1
+        assert rows[0].price == Decimal("2.2")
